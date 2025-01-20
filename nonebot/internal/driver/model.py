@@ -1,56 +1,47 @@
 import abc
-import urllib.request
-from enum import Enum
+from collections.abc import Awaitable, Iterator, Mapping, MutableMapping
 from dataclasses import dataclass
+from enum import Enum
 from http.cookiejar import Cookie, CookieJar
-from typing import (
-    IO,
-    Any,
-    Dict,
-    List,
-    Tuple,
-    Union,
-    Mapping,
-    Callable,
-    Iterator,
-    Optional,
-    Awaitable,
-    MutableMapping,
-)
+from typing import IO, Any, Callable, Optional, Union
+from typing_extensions import TypeAlias
+import urllib.request
 
-from yarl import URL as URL
 from multidict import CIMultiDict
+from yarl import URL as URL
 
-RawURL = Tuple[bytes, bytes, Optional[int], bytes]
+RawURL: TypeAlias = tuple[bytes, bytes, Optional[int], bytes]
 
-SimpleQuery = Union[str, int, float]
-QueryVariable = Union[SimpleQuery, List[SimpleQuery]]
-QueryTypes = Union[
-    None, str, Mapping[str, QueryVariable], List[Tuple[str, QueryVariable]]
+SimpleQuery: TypeAlias = Union[str, int, float]
+QueryVariable: TypeAlias = Union[SimpleQuery, list[SimpleQuery]]
+QueryTypes: TypeAlias = Union[
+    None, str, Mapping[str, QueryVariable], list[tuple[str, SimpleQuery]]
 ]
 
-HeaderTypes = Union[
+HeaderTypes: TypeAlias = Union[
     None,
     CIMultiDict[str],
-    Dict[str, str],
-    List[Tuple[str, str]],
+    dict[str, str],
+    list[tuple[str, str]],
 ]
 
-CookieTypes = Union[None, "Cookies", CookieJar, Dict[str, str], List[Tuple[str, str]]]
+CookieTypes: TypeAlias = Union[
+    None, "Cookies", CookieJar, dict[str, str], list[tuple[str, str]]
+]
 
-ContentTypes = Union[str, bytes, None]
-DataTypes = Union[dict, None]
-FileContent = Union[IO[bytes], bytes]
-FileType = Tuple[Optional[str], FileContent, Optional[str]]
-FileTypes = Union[
+ContentTypes: TypeAlias = Union[str, bytes, None]
+DataTypes: TypeAlias = Union[dict, None]
+FileContent: TypeAlias = Union[IO[bytes], bytes]
+FileType: TypeAlias = tuple[Optional[str], FileContent, Optional[str]]
+FileTypes: TypeAlias = Union[
     # file (or bytes)
     FileContent,
     # (filename, file (or bytes))
-    Tuple[Optional[str], FileContent],
+    tuple[Optional[str], FileContent],
     # (filename, file (or bytes), content_type)
     FileType,
 ]
-FilesTypes = Union[Dict[str, FileTypes], List[Tuple[str, FileTypes]], None]
+FilesTypes: TypeAlias = Union[dict[str, FileTypes], list[tuple[str, FileTypes]], None]
 
 
 class HTTPVersion(Enum):
@@ -116,13 +107,13 @@ class Request:
         self.content: ContentTypes = content
         self.data: DataTypes = data
         self.json: Any = json
-        self.files: Optional[List[Tuple[str, FileType]]] = None
+        self.files: Optional[list[tuple[str, FileType]]] = None
         if files:
             self.files = []
             files_ = files.items() if isinstance(files, dict) else files
             for name, file_info in files_:
                 if not isinstance(file_info, tuple):
-                    self.files.append((name, (None, file_info, None)))
+                    self.files.append((name, (name, file_info, None)))
                 elif len(file_info) == 2:
                     self.files.append((name, (file_info[0], file_info[1], None)))
                 else:
@@ -160,7 +151,6 @@ class Response:
 
 class WebSocket(abc.ABC):
     def __init__(self, *, request: Request):
-        # request
         self.request: Request = request
 
     def __repr__(self) -> str:
@@ -169,9 +159,7 @@ class WebSocket(abc.ABC):
     @property
     @abc.abstractmethod
     def closed(self) -> bool:
-        """
-        连接是否已经关闭
-        """
+        """连接是否已经关闭"""
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -257,7 +245,7 @@ class Cookies(MutableMapping):
         )
         self.jar.set_cookie(cookie)
 
-    def get(
+    def get(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         name: str,
         default: Optional[str] = None,
@@ -298,12 +286,14 @@ class Cookies(MutableMapping):
     def clear(self, domain: Optional[str] = None, path: Optional[str] = None) -> None:
         self.jar.clear(domain, path)
 
-    def update(self, cookies: CookieTypes = None) -> None:
+    def update(  # pyright: ignore[reportIncompatibleMethodOverride]
+        self, cookies: CookieTypes = None
+    ) -> None:
         cookies = Cookies(cookies)
         for cookie in cookies.jar:
             self.jar.set_cookie(cookie)
 
-    def as_header(self, request: Request) -> Dict[str, str]:
+    def as_header(self, request: Request) -> dict[str, str]:
         urllib_request = self._CookieCompatRequest(request)
         self.jar.add_cookie_header(urllib_request)
         return urllib_request.added_headers
@@ -341,9 +331,11 @@ class Cookies(MutableMapping):
                 method=request.method,
             )
             self.request = request
-            self.added_headers: Dict[str, str] = {}
+            self.added_headers: dict[str, str] = {}
 
-        def add_unredirected_header(self, key: str, value: str) -> None:
+        def add_unredirected_header(  # pyright: ignore[reportIncompatibleMethodOverride]
+            self, key: str, value: str
+        ) -> None:
             super().add_unredirected_header(key, value)
             self.added_headers[key] = value
 

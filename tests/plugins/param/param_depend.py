@@ -1,7 +1,11 @@
 from dataclasses import dataclass
-from typing_extensions import Annotated
+from typing import Annotated
+
+import anyio
+from pydantic import Field
 
 from nonebot import on_message
+from nonebot.adapters import Bot
 from nonebot.params import Depends
 
 test_depends = on_message()
@@ -29,8 +33,15 @@ async def gen_async():
 
 @dataclass
 class ClassDependency:
-    x: int = Depends(gen_sync)
-    y: int = Depends(gen_async)
+    x: int = Depends(gen_sync)  # noqa: RUF009
+    y: int = Depends(gen_async)  # noqa: RUF009
+
+
+class FooBot(Bot): ...
+
+
+async def sub_bot(b: FooBot) -> FooBot:
+    return b
 
 
 # test parameterless
@@ -46,19 +57,75 @@ async def depends_cache(y: int = Depends(dependency, use_cache=True)):
     return y
 
 
+# test class dependency
 async def class_depend(c: ClassDependency = Depends()):
     return c
 
 
+# test annotated dependency
 async def annotated_depend(x: Annotated[int, Depends(dependency)]):
     return x
 
 
+# test annotated class dependency
 async def annotated_class_depend(c: Annotated[ClassDependency, Depends()]):
     return c
 
 
+# test dependency priority
 async def annotated_prior_depend(
-    x: Annotated[int, Depends(lambda: 2)] = Depends(dependency)
+    x: Annotated[int, Depends(lambda: 2)] = Depends(dependency),
 ):
     return x
+
+
+async def annotated_multi_depend(
+    x: Annotated[Annotated[int, Depends(lambda: 2)], Depends(dependency)],
+):
+    return x
+
+
+# test sub dependency type mismatch
+async def sub_type_mismatch(b: FooBot = Depends(sub_bot)):
+    return b
+
+
+# test type validate
+async def validate(x: int = Depends(lambda: "1", validate=True)):
+    return x
+
+
+async def validate_fail(x: int = Depends(lambda: "not_number", validate=True)):
+    return x
+
+
+# test FieldInfo validate
+async def validate_field(x: int = Depends(lambda: "1", validate=Field(gt=0))):
+    return x
+
+
+async def validate_field_fail(x: int = Depends(lambda: "0", validate=Field(gt=0))):
+    return x
+
+
+async def _dep():
+    await anyio.sleep(1)
+    return 1
+
+
+def _dep_mismatch():
+    return 1
+
+
+async def cache_exception_func1(
+    dep: int = Depends(_dep),
+    mismatch: dict = Depends(_dep_mismatch),
+):
+    raise RuntimeError("Never reach here")
+
+
+async def cache_exception_func2(
+    dep: int = Depends(_dep),
+    match: int = Depends(_dep_mismatch),
+):
+    return dep

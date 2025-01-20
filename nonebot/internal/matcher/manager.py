@@ -1,19 +1,5 @@
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    List,
-    Type,
-    Tuple,
-    Union,
-    TypeVar,
-    Iterator,
-    KeysView,
-    Optional,
-    ItemsView,
-    ValuesView,
-    MutableMapping,
-    overload,
-)
+from collections.abc import ItemsView, Iterator, KeysView, MutableMapping, ValuesView
+from typing import TYPE_CHECKING, Optional, TypeVar, Union, overload
 
 from .provider import DEFAULT_PROVIDER_CLASS, MatcherProvider
 
@@ -23,7 +9,7 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
-class MatcherManager(MutableMapping[int, List[Type["Matcher"]]]):
+class MatcherManager(MutableMapping[int, list[type["Matcher"]]]):
     """事件响应器管理器
 
     实现了常用字典操作，用于管理事件响应器。
@@ -44,58 +30,60 @@ class MatcherManager(MutableMapping[int, List[Type["Matcher"]]]):
     def __len__(self) -> int:
         return len(self.provider)
 
-    def __getitem__(self, key: int) -> List[Type["Matcher"]]:
+    def __getitem__(self, key: int) -> list[type["Matcher"]]:
         return self.provider[key]
 
-    def __setitem__(self, key: int, value: List[Type["Matcher"]]) -> None:
+    def __setitem__(self, key: int, value: list[type["Matcher"]]) -> None:
         self.provider[key] = value
 
     def __delitem__(self, key: int) -> None:
         del self.provider[key]
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return isinstance(other, MatcherManager) and self.provider == other.provider
 
     def keys(self) -> KeysView[int]:
         return self.provider.keys()
 
-    def values(self) -> ValuesView[List[Type["Matcher"]]]:
+    def values(self) -> ValuesView[list[type["Matcher"]]]:
         return self.provider.values()
 
-    def items(self) -> ItemsView[int, List[Type["Matcher"]]]:
+    def items(self) -> ItemsView[int, list[type["Matcher"]]]:
         return self.provider.items()
 
     @overload
-    def get(self, key: int) -> Optional[List[Type["Matcher"]]]:
-        ...
+    def get(self, key: int) -> Optional[list[type["Matcher"]]]: ...
 
     @overload
-    def get(self, key: int, default: T) -> Union[List[Type["Matcher"]], T]:
-        ...
+    def get(self, key: int, default: T) -> Union[list[type["Matcher"]], T]: ...
 
     def get(
         self, key: int, default: Optional[T] = None
-    ) -> Optional[Union[List[Type["Matcher"]], T]]:
+    ) -> Optional[Union[list[type["Matcher"]], T]]:
         return self.provider.get(key, default)
 
-    def pop(self, key: int) -> List[Type["Matcher"]]:
+    def pop(  # pyright: ignore[reportIncompatibleMethodOverride]
+        self, key: int
+    ) -> list[type["Matcher"]]:
         return self.provider.pop(key)
 
-    def popitem(self) -> Tuple[int, List[Type["Matcher"]]]:
+    def popitem(self) -> tuple[int, list[type["Matcher"]]]:
         return self.provider.popitem()
 
     def clear(self) -> None:
         self.provider.clear()
 
-    def update(self, __m: MutableMapping[int, List[Type["Matcher"]]]) -> None:
-        self.provider.update(__m)
+    def update(  # pyright: ignore[reportIncompatibleMethodOverride]
+        self, m: MutableMapping[int, list[type["Matcher"]]], /
+    ) -> None:
+        self.provider.update(m)
 
     def setdefault(
-        self, key: int, default: List[Type["Matcher"]]
-    ) -> List[Type["Matcher"]]:
+        self, key: int, default: list[type["Matcher"]]
+    ) -> list[type["Matcher"]]:
         return self.provider.setdefault(key, default)
 
-    def set_provider(self, provider_class: Type[MatcherProvider]) -> None:
+    def set_provider(self, provider_class: type[MatcherProvider]) -> None:
         """设置事件响应器存储器
 
         参数:

@@ -1,37 +1,32 @@
 """本模块模块实现了依赖注入的定义与处理。
 
 FrontMatter:
+    mdx:
+        format: md
     sidebar_position: 0
     description: nonebot.dependencies 模块
 """
 
 import abc
-import asyncio
+from collections.abc import Awaitable, Iterable
+from dataclasses import dataclass, field
+from functools import partial
 import inspect
-from dataclasses import field, dataclass
-from typing import (
-    Any,
-    Dict,
-    List,
-    Type,
-    Tuple,
-    Generic,
-    TypeVar,
-    Callable,
-    Iterable,
-    Optional,
-    Awaitable,
-    cast,
-)
+from typing import Any, Callable, Generic, Optional, TypeVar, cast
 
-from pydantic import BaseConfig
-from pydantic.schema import get_annotation_from_field_info
-from pydantic.fields import Required, FieldInfo, Undefined, ModelField
+import anyio
+from exceptiongroup import BaseExceptionGroup, catch
 
+from nonebot.compat import FieldInfo, ModelField, PydanticUndefined
+from nonebot.exception import SkippedException
 from nonebot.log import logger
 from nonebot.typing import _DependentCallable
-from nonebot.exception import SkippedException
-from nonebot.utils import run_sync, is_coroutine_callable
+from nonebot.utils import (
+    flatten_exception_group,
+    is_coroutine_callable,
+    run_coro_with_shield,
+    run_sync,
+)
 
 from .utils import check_field_type, get_typed_signature
 
@@ -45,15 +40,19 @@ class Param(abc.ABC, FieldInfo):
     继承自 `pydantic.fields.FieldInfo`，用于描述参数信息（不包括参数名）。
     """
 
+    def __init__(self, *args, validate: bool = False, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.validate = validate
+
     @classmethod
     def _check_param(
-        cls, param: inspect.Parameter, allow_types: Tuple[Type["Param"], ...]
+        cls, param: inspect.Parameter, allow_types: tuple[type["Param"], ...]
     ) -> Optional["Param"]:
         return
 
     @classmethod
     def _check_parameterless(
-        cls, value: Any, allow_types: Tuple[Type["Param"], ...]
+        cls, value: Any, allow_types: tuple[type["Param"], ...]
     ) -> Optional["Param"]:
         return
 
@@ -63,10 +62,6 @@ class Param(abc.ABC, FieldInfo):
 
     async def _check(self, **kwargs: Any) -> None:
         return
-
-
-class CustomConfig(BaseConfig):
-    arbitrary_types_allowed = True
 
 
 @dataclass(frozen=True)
@@ -82,8 +77,8 @@ class Dependent(Generic[R]):
     """
 
     call: _DependentCallable[R]
-    params: Tuple[ModelField] = field(default_factory=tuple)
-    parameterless: Tuple[Param] = field(default_factory=tuple)
+    params: tuple[ModelField, ...] = field(default_factory=tuple)
+    parameterless: tuple[Param, ...] = field(default_factory=tuple)
 
     def __repr__(self) -> str:
         if inspect.isfunction(self.call) or inspect.isclass(self.call):
@@ -97,60 +92,57 @@ class Dependent(Generic[R]):
         )
 
     async def __call__(self, **kwargs: Any) -> R:
-        # do pre-check
-        await self.check(**kwargs)
+        exception: Optional[BaseExceptionGroup[SkippedException]] = None
 
-        # solve param values
-        values = await self.solve(**kwargs)
+        def _handle_skipped(exc_group: BaseExceptionGroup[SkippedException]):
+            nonlocal exception
+            exception = exc_group
+            # raise one of the exceptions instead
+            excs = list(flatten_exception_group(exc_group))
+            logger.trace(f"{self} skipped due to {excs}")
 
-        # call function
-        if is_coroutine_callable(self.call):
-            return await cast(Callable[..., Awaitable[R]], self.call)(**values)
-        else:
-            return await run_sync(cast(Callable[..., R], self.call))(**values)
+        with catch({SkippedException: _handle_skipped}):
+            # do pre-check
+            await self.check(**kwargs)
+
+            # solve param values
+            values = await self.solve(**kwargs)
+
+            # call function
+            if is_coroutine_callable(self.call):
+                return await cast(Callable[..., Awaitable[R]], self.call)(**values)
+            else:
+                return await run_sync(cast(Callable[..., R], self.call))(**values)
+
+        raise exception
 
     @staticmethod
     def parse_params(
-        call: _DependentCallable[R], allow_types: Tuple[Type[Param], ...]
-    ) -> Tuple[ModelField]:
-        fields: List[ModelField] = []
+        call: _DependentCallable[R], allow_types: tuple[type[Param], ...]
+    ) -> tuple[ModelField, ...]:
+        fields: list[ModelField] = []
         params = get_typed_signature(call).parameters.values()
 
         for param in params:
-            default_value = Required
-            if param.default != param.empty:
-                default_value = param.default
-
-            if isinstance(default_value, Param):
-                field_info = default_value
+            if isinstance(param.default, Param):
+                field_info = param.default
             else:
                 for allow_type in allow_types:
                     if field_info := allow_type._check_param(param, allow_types):
                         break
                 else:
                     raise ValueError(
-                        f"Unknown parameter {param.name} for function {call} with type {param.annotation}"
+                        f"Unknown parameter {param.name} "
+                        f"for function {call} with type {param.annotation}"
                     )
 
-            default_value = field_info.default
-
             annotation: Any = Any
-            required = default_value == Required
-            if param.annotation != param.empty:
+            if param.annotation is not param.empty:
                 annotation = param.annotation
-            annotation = get_annotation_from_field_info(
-                annotation, field_info, param.name
-            )
 
             fields.append(
-                ModelField(
-                    name=param.name,
-                    type_=annotation,
-                    class_validators=None,
-                    model_config=CustomConfig,
-                    default=None if required else default_value,
-                    required=required,
-                    field_info=field_info,
+                ModelField.construct(
+                    name=param.name, annotation=annotation, field_info=field_info
                 )
             )
 
@@ -158,9 +150,9 @@ class Dependent(Generic[R]):
 
     @staticmethod
     def parse_parameterless(
-        parameterless: Tuple[Any, ...], allow_types: Tuple[Type[Param], ...]
-    ) -> Tuple[Param, ...]:
-        parameterless_params: List[Param] = []
+        parameterless: tuple[Any, ...], allow_types: tuple[type[Param], ...]
+    ) -> tuple[Param, ...]:
+        parameterless_params: list[Param] = []
         for value in parameterless:
             for allow_type in allow_types:
                 if param := allow_type._check_parameterless(value, allow_types):
@@ -176,13 +168,13 @@ class Dependent(Generic[R]):
         *,
         call: _DependentCallable[R],
         parameterless: Optional[Iterable[Any]] = None,
-        allow_types: Iterable[Type[Param]],
+        allow_types: Iterable[type[Param]],
     ) -> "Dependent[R]":
         allow_types = tuple(allow_types)
 
         params = cls.parse_params(call, allow_types)
         parameterless_params = (
-            tuple()
+            ()
             if parameterless is None
             else cls.parse_parameterless(tuple(parameterless), allow_types)
         )
@@ -190,36 +182,48 @@ class Dependent(Generic[R]):
         return cls(call, params, parameterless_params)
 
     async def check(self, **params: Any) -> None:
-        try:
-            await asyncio.gather(
-                *(param._check(**params) for param in self.parameterless)
-            )
-            await asyncio.gather(
-                *(
-                    cast(Param, param.field_info)._check(**params)
-                    for param in self.params
-                )
-            )
-        except SkippedException as e:
-            logger.trace(f"{self} skipped due to {e}")
-            raise
+        if self.parameterless:
+            async with anyio.create_task_group() as tg:
+                for param in self.parameterless:
+                    tg.start_soon(partial(param._check, **params))
 
-    async def _solve_field(self, field: ModelField, params: Dict[str, Any]) -> Any:
-        value = await cast(Param, field.field_info)._solve(**params)
-        if value is Undefined:
+        if self.params:
+            async with anyio.create_task_group() as tg:
+                for param in self.params:
+                    tg.start_soon(
+                        partial(cast(Param, param.field_info)._check, **params)
+                    )
+
+    async def _solve_field(self, field: ModelField, params: dict[str, Any]) -> Any:
+        param = cast(Param, field.field_info)
+        value = await param._solve(**params)
+        if value is PydanticUndefined:
             value = field.get_default()
-        return check_field_type(field, value)
+        v = check_field_type(field, value)
+        return v if param.validate else value
 
-    async def solve(self, **params: Any) -> Dict[str, Any]:
+    async def solve(self, **params: Any) -> dict[str, Any]:
         # solve parameterless
         for param in self.parameterless:
             await param._solve(**params)
 
         # solve param values
-        values = await asyncio.gather(
-            *(self._solve_field(field, params) for field in self.params)
-        )
-        return {field.name: value for field, value in zip(self.params, values)}
+        result: dict[str, Any] = {}
+        if not self.params:
+            return result
+
+        async def _solve_field(field: ModelField, params: dict[str, Any]) -> None:
+            value = await self._solve_field(field, params)
+            result[field.name] = value
+
+        async with anyio.create_task_group() as tg:
+            for field in self.params:
+                # shield the task to prevent cancellation
+                # when one of the tasks raises an exception
+                # this will improve the dependency cache reusability
+                tg.start_soon(run_coro_with_shield, _solve_field(field, params))
+
+        return result
 
 
 __autodoc__ = {"CustomConfig": False}

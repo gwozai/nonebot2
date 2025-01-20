@@ -25,13 +25,15 @@ NoneBotException
 ```
 
 FrontMatter:
+    mdx:
+        format: md
     sidebar_position: 10
     description: nonebot.exception 模块
 """
 
 from typing import Any, Optional
 
-from pydantic.fields import ModelField
+from nonebot.compat import ModelField
 
 
 class NoneBotException(Exception):
@@ -43,9 +45,9 @@ class NoneBotException(Exception):
 
 # Rule Exception
 class ParserExit(NoneBotException):
-    """{ref}`nonebot.rule.shell_command` 处理消息失败时返回的异常"""
+    """{ref}`nonebot.rule.shell_command` 处理消息失败时返回的异常。"""
 
-    def __init__(self, status: int = 0, message: Optional[str] = None):
+    def __init__(self, status: int = 0, message: Optional[str] = None) -> None:
         self.status = status
         self.message = message
 
@@ -69,7 +71,7 @@ class IgnoredException(ProcessException):
         reason: 忽略事件的原因
     """
 
-    def __init__(self, reason: Any):
+    def __init__(self, reason: Any) -> None:
         self.reason: Any = reason
 
     def __repr__(self) -> str:
@@ -96,7 +98,7 @@ class SkippedException(ProcessException):
 class TypeMisMatch(SkippedException):
     """当前 `Handler` 的参数类型不匹配。"""
 
-    def __init__(self, param: ModelField, value: Any):
+    def __init__(self, param: ModelField, value: Any) -> None:
         self.param: ModelField = param
         self.value: Any = value
 
@@ -108,7 +110,8 @@ class TypeMisMatch(SkippedException):
 
 
 class MockApiException(ProcessException):
-    """指示 NoneBot 阻止本次 API 调用或修改本次调用返回值，并返回自定义内容。可由 api hook 抛出。
+    """指示 NoneBot 阻止本次 API 调用或修改本次调用返回值，并返回自定义内容。
+    可由 api hook 抛出。
 
     参数:
         result: 返回的内容
@@ -144,7 +147,8 @@ class MatcherException(NoneBotException):
 
 
 class PausedException(MatcherException):
-    """指示 NoneBot 结束当前 `Handler` 并等待下一条消息后继续下一个 `Handler`。可用于用户输入新信息。
+    """指示 NoneBot 结束当前 `Handler` 并等待下一条消息后继续下一个 `Handler`。
+    可用于用户输入新信息。
 
     可以在 `Handler` 中通过 {ref}`nonebot.matcher.Matcher.pause` 抛出。
 
@@ -158,7 +162,8 @@ class PausedException(MatcherException):
 
 
 class RejectedException(MatcherException):
-    """指示 NoneBot 结束当前 `Handler` 并等待下一条消息后重新运行当前 `Handler`。可用于用户重新输入。
+    """指示 NoneBot 结束当前 `Handler` 并等待下一条消息后重新运行当前 `Handler`。
+    可用于用户重新输入。
 
     可以在 `Handler` 中通过 {ref}`nonebot.matcher.Matcher.reject` 抛出。
 
@@ -187,7 +192,7 @@ class FinishedException(MatcherException):
 
 # Adapter Exceptions
 class AdapterException(NoneBotException):
-    """代表 `Adapter` 抛出的异常，所有的 `Adapter` 都要在内部继承自这个 `Exception`
+    """代表 `Adapter` 抛出的异常，所有的 `Adapter` 都要在内部继承自这个 `Exception`。
 
     参数:
         adapter_name: 标识 adapter
@@ -210,7 +215,9 @@ class ApiNotAvailable(AdapterException):
 
 
 class NetworkError(AdapterException):
-    """在网络出现问题时抛出，如: API 请求地址不正确, API 请求无返回或返回状态非正常等。"""
+    """在网络出现问题时抛出，
+    如: API 请求地址不正确, API 请求无返回或返回状态非正常等。
+    """
 
 
 class ActionFailed(AdapterException):
@@ -219,13 +226,13 @@ class ActionFailed(AdapterException):
 
 # Driver Exceptions
 class DriverException(NoneBotException):
-    """`Driver` 抛出的异常基类"""
+    """`Driver` 抛出的异常基类。"""
 
 
 class WebSocketClosed(DriverException):
-    """WebSocket 连接已关闭"""
+    """WebSocket 连接已关闭。"""
 
-    def __init__(self, code: int, reason: Optional[str] = None):
+    def __init__(self, code: int, reason: Optional[str] = None) -> None:
         self.code = code
         self.reason = reason
 

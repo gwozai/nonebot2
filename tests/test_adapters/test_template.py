@@ -1,5 +1,7 @@
+import pytest
+
 from nonebot.adapters import MessageTemplate
-from utils import escape_text, make_fake_message
+from utils import FakeMessage, FakeMessageSegment, escape_text
 
 
 def test_template_basis():
@@ -9,19 +11,14 @@ def test_template_basis():
 
 
 def test_template_message():
-    Message = make_fake_message()
-    template = Message.template("{a:custom}{b:text}{c:image}/{d}")
+    template = FakeMessage.template("{a:custom}{b:text}{c:image}/{d}")
 
     @template.add_format_spec
     def custom(input: str) -> str:
         return f"{input}-custom!"
 
-    try:
+    with pytest.raises(ValueError, match="already exists"):
         template.add_format_spec(custom)
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("Should raise ValueError")
 
     format_args = {
         "a": "custom",
@@ -37,29 +34,43 @@ def test_template_message():
 
 
 def test_rich_template_message():
-    Message = make_fake_message()
-    MS = Message.get_segment_class()
-
     pic1, pic2, pic3 = (
-        MS.image("file:///pic1.jpg"),
-        MS.image("file:///pic2.jpg"),
-        MS.image("file:///pic3.jpg"),
+        FakeMessageSegment.image("file:///pic1.jpg"),
+        FakeMessageSegment.image("file:///pic2.jpg"),
+        FakeMessageSegment.image("file:///pic3.jpg"),
     )
 
-    template = Message.template("{}{}" + pic2 + "{}")
+    template = FakeMessage.template("{}{}" + pic2 + "{}")
 
     result = template.format(pic1, "[fake:image]", pic3)
 
-    assert result["image"] == Message([pic1, pic2, pic3])
+    assert result["image"] == FakeMessage([pic1, pic2, pic3])
     assert str(result) == (
         "[fake:image]" + escape_text("[fake:image]") + "[fake:image]" + "[fake:image]"
     )
 
 
 def test_message_injection():
-    Message = make_fake_message()
-
-    template = Message.template("{name}Is Bad")
+    template = FakeMessage.template("{name}Is Bad")
     message = template.format(name="[fake:image]")
 
     assert message.extract_plain_text() == escape_text("[fake:image]Is Bad")
+
+
+def test_malformed_template():
+    positive_template = FakeMessage.template("{a}{b}")
+    message = positive_template.format(a="a", b="b")
+    assert message.extract_plain_text() == "ab"
+
+    malformed_template = FakeMessage.template("{a.__init__}")
+    with pytest.raises(ValueError, match="private attribute"):
+        message = malformed_template.format(a="a")
+
+    malformed_template = FakeMessage.template("{a[__builtins__]}")
+    with pytest.raises(ValueError, match="private attribute"):
+        message = malformed_template.format(a=globals())
+
+    malformed_template = MessageTemplate(
+        "{a[__builtins__][__import__]}{b.__init__}", private_getattr=True
+    )
+    message = malformed_template.format(a=globals(), b="b")

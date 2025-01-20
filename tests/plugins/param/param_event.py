@@ -1,10 +1,14 @@
-from typing import Union
+from typing import TypeVar, Union
 
 from nonebot.adapters import Event, Message
-from nonebot.params import EventToMe, EventType, EventMessage, EventPlainText
+from nonebot.params import EventMessage, EventPlainText, EventToMe, EventType
 
 
 async def event(e: Event) -> Event:
+    return e
+
+
+async def postpone_event(e: "Event") -> Event:
     return e
 
 
@@ -12,28 +16,38 @@ async def legacy_event(event):
     return event
 
 
-async def not_legacy_event(event: int):
-    ...
+async def not_legacy_event(event: int): ...
 
 
-class FooEvent(Event):
-    ...
+class FooEvent(Event): ...
 
 
 async def sub_event(e: FooEvent) -> FooEvent:
     return e
 
 
-class BarEvent(Event):
-    ...
+class BarEvent(Event): ...
 
 
 async def union_event(e: Union[FooEvent, BarEvent]) -> Union[FooEvent, BarEvent]:
     return e
 
 
-async def not_event(e: Union[int, Event]):
-    ...
+E = TypeVar("E", bound=Event)
+
+
+async def generic_event(e: E) -> E:
+    return e
+
+
+CE = TypeVar("CE", Event, None)
+
+
+async def generic_event_none(e: CE) -> CE:
+    return e
+
+
+async def not_event(e: Union[int, Event]): ...
 
 
 async def event_type(t: str = EventType()) -> str:

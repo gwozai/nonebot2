@@ -1,26 +1,25 @@
-from typing import Type, Callable, Optional
+from typing import Callable, Optional
 
 import pytest
 
 import nonebot
 from nonebot.adapters import Event
-from nonebot.typing import T_RuleChecker
 from nonebot.matcher import Matcher, matchers
 from nonebot.rule import (
-    RegexRule,
-    IsTypeRule,
     CommandRule,
     EndswithRule,
-    KeywordsRule,
     FullmatchRule,
-    StartswithRule,
+    IsTypeRule,
+    KeywordsRule,
+    RegexRule,
     ShellCommandRule,
+    StartswithRule,
 )
+from nonebot.typing import T_RuleChecker
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "matcher_name, pre_rule_factory, has_permission",
+    ("matcher_name", "pre_rule_factory", "has_permission"),
     [
         pytest.param("matcher_on", None, True),
         pytest.param("matcher_on_metaevent", None, False),
@@ -41,10 +40,30 @@ from nonebot.rule import (
         ),
         pytest.param("matcher_on_regex", lambda e: RegexRule("test"), True),
         pytest.param("matcher_on_type", lambda e: IsTypeRule(e), True),
-        pytest.param("matcher_sub_cmd", lambda e: CommandRule([("test", "sub")]), True),
         pytest.param(
-            "matcher_sub_shell_cmd",
-            lambda e: ShellCommandRule([("test", "sub")], None),
+            "matcher_prefix_cmd",
+            lambda e: CommandRule([("prefix", "sub"), ("help",), ("help", "foo")]),
+            True,
+        ),
+        pytest.param(
+            "matcher_prefix_shell_cmd",
+            lambda e: ShellCommandRule(
+                [("prefix", "sub"), ("help",), ("help", "foo")], None
+            ),
+            True,
+        ),
+        pytest.param(
+            "matcher_prefix_aliases_cmd",
+            lambda e: CommandRule(
+                [("prefix", "sub"), ("prefix", "help"), ("prefix", "help", "foo")]
+            ),
+            True,
+        ),
+        pytest.param(
+            "matcher_prefix_aliases_shell_cmd",
+            lambda e: ShellCommandRule(
+                [("prefix", "sub"), ("prefix", "help"), ("prefix", "help", "foo")], None
+            ),
             True,
         ),
         pytest.param("matcher_group_on", None, True),
@@ -82,20 +101,20 @@ from nonebot.rule import (
         pytest.param("matcher_group_on_type", lambda e: IsTypeRule(e), True),
     ],
 )
-async def test_on(
+def test_on(
     matcher_name: str,
-    pre_rule_factory: Optional[Callable[[Type[Event]], T_RuleChecker]],
+    pre_rule_factory: Optional[Callable[[type[Event]], T_RuleChecker]],
     has_permission: bool,
 ):
     import plugins.plugin.matchers as module
     from plugins.plugin.matchers import (
         TestEvent,
+        expire_time,
+        handler,
+        permission,
+        priority,
         rule,
         state,
-        handler,
-        priority,
-        permission,
-        expire_time,
     )
 
     matcher = getattr(module, matcher_name)
@@ -125,12 +144,12 @@ async def test_on(
     assert matcher.plugin is plugin
     assert matcher in plugin.matcher
     assert matcher.module is module
+    assert matcher.plugin_id == "plugin"
     assert matcher.plugin_name == "plugin"
     assert matcher.module_name == "plugins.plugin.matchers"
 
 
-@pytest.mark.asyncio
-async def test_runtime_on():
+def test_runtime_on():
     import plugins.plugin.matchers as module
     from plugins.plugin.matchers import matcher_on_factory
 
@@ -143,6 +162,7 @@ async def test_runtime_on():
         assert matcher.plugin is plugin
         assert matcher not in plugin.matcher
         assert matcher.module is module
+        assert matcher.plugin_id == "plugin"
         assert matcher.plugin_name == "plugin"
         assert matcher.module_name == "plugins.plugin.matchers"
     finally:

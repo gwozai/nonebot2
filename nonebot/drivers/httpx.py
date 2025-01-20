@@ -11,71 +11,152 @@ pip install nonebot2[httpx]
 :::
 
 FrontMatter:
+    mdx:
+        format: md
     sidebar_position: 3
     description: nonebot.drivers.httpx 模块
 """
-from typing import Type, AsyncGenerator
-from contextlib import asynccontextmanager
 
-from nonebot.typing import overrides
-from nonebot.drivers.none import Driver as NoneDriver
+from typing import TYPE_CHECKING, Optional, Union
+from typing_extensions import override
+
+from multidict import CIMultiDict
+
 from nonebot.drivers import (
+    URL,
+    HTTPClientMixin,
+    HTTPClientSession,
+    HTTPVersion,
     Request,
     Response,
-    WebSocket,
-    HTTPVersion,
-    ForwardMixin,
-    ForwardDriver,
     combine_driver,
 )
+from nonebot.drivers.none import Driver as NoneDriver
+from nonebot.internal.driver import Cookies, CookieTypes, HeaderTypes, QueryTypes
 
 try:
     import httpx
 except ModuleNotFoundError as e:  # pragma: no cover
     raise ImportError(
-        "Please install httpx by using `pip install nonebot2[httpx]`"
+        "Please install httpx first to use this driver. "
+        "Install with pip: `pip install nonebot2[httpx]`"
     ) from e
 
 
-class Mixin(ForwardMixin):
+class Session(HTTPClientSession):
+    @override
+    def __init__(
+        self,
+        params: QueryTypes = None,
+        headers: HeaderTypes = None,
+        cookies: CookieTypes = None,
+        version: Union[str, HTTPVersion] = HTTPVersion.H11,
+        timeout: Optional[float] = None,
+        proxy: Optional[str] = None,
+    ):
+        self._client: Optional[httpx.AsyncClient] = None
+
+        self._params = (
+            tuple(URL.build(query=params).query.items()) if params is not None else None
+        )
+        self._headers = (
+            tuple(CIMultiDict(headers).items()) if headers is not None else None
+        )
+        self._cookies = Cookies(cookies)
+        self._version = HTTPVersion(version)
+        self._timeout = timeout
+        self._proxy = proxy
+
+    @property
+    def client(self) -> httpx.AsyncClient:
+        if self._client is None:
+            raise RuntimeError("Session is not initialized")
+        return self._client
+
+    @override
+    async def request(self, setup: Request) -> Response:
+        response = await self.client.request(
+            setup.method,
+            str(setup.url),
+            content=setup.content,
+            data=setup.data,
+            files=setup.files,
+            json=setup.json,
+            # ensure the params priority
+            params=setup.url.raw_query_string,
+            headers=tuple(setup.headers.items()),
+            cookies=setup.cookies.jar,
+            timeout=setup.timeout,
+        )
+        return Response(
+            response.status_code,
+            headers=response.headers.multi_items(),
+            content=response.content,
+            request=setup,
+        )
+
+    @override
+    async def setup(self) -> None:
+        if self._client is not None:
+            raise RuntimeError("Session has already been initialized")
+        self._client = httpx.AsyncClient(
+            params=self._params,
+            headers=self._headers,
+            cookies=self._cookies.jar,
+            http2=self._version == HTTPVersion.H2,
+            proxy=self._proxy,
+            follow_redirects=True,
+        )
+        await self._client.__aenter__()
+
+    @override
+    async def close(self) -> None:
+        try:
+            if self._client is not None:
+                await self._client.aclose()
+        finally:
+            self._client = None
+
+
+class Mixin(HTTPClientMixin):
     """HTTPX Mixin"""
 
     @property
-    @overrides(ForwardMixin)
+    @override
     def type(self) -> str:
         return "httpx"
 
-    @overrides(ForwardMixin)
+    @override
     async def request(self, setup: Request) -> Response:
-        async with httpx.AsyncClient(
-            cookies=setup.cookies.jar,
-            http2=setup.version == HTTPVersion.H2,
-            proxies=setup.proxy,
-            follow_redirects=True,
-        ) as client:
-            response = await client.request(
-                setup.method,
-                str(setup.url),
-                content=setup.content,
-                data=setup.data,
-                json=setup.json,
-                files=setup.files,
-                headers=tuple(setup.headers.items()),
-                timeout=setup.timeout,
-            )
-            return Response(
-                response.status_code,
-                headers=response.headers.multi_items(),
-                content=response.content,
-                request=setup,
-            )
+        async with self.get_session(
+            version=setup.version, proxy=setup.proxy
+        ) as session:
+            return await session.request(setup)
 
-    @overrides(ForwardMixin)
-    @asynccontextmanager
-    async def websocket(self, setup: Request) -> AsyncGenerator[WebSocket, None]:
-        async with super(Mixin, self).websocket(setup) as ws:
-            yield ws
+    @override
+    def get_session(
+        self,
+        params: QueryTypes = None,
+        headers: HeaderTypes = None,
+        cookies: CookieTypes = None,
+        version: Union[str, HTTPVersion] = HTTPVersion.H11,
+        timeout: Optional[float] = None,
+        proxy: Optional[str] = None,
+    ) -> Session:
+        return Session(
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            version=version,
+            timeout=timeout,
+            proxy=proxy,
+        )
 
 
-Driver: Type[ForwardDriver] = combine_driver(NoneDriver, Mixin)  # type: ignore
-"""HTTPX Driver"""
+if TYPE_CHECKING:
+
+    class Driver(Mixin, NoneDriver): ...
+
+else:
+    Driver = combine_driver(NoneDriver, Mixin)
+    """HTTPX Driver"""

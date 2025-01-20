@@ -1,27 +1,31 @@
-from typing import List, Tuple
+from re import Match
 
-from nonebot.typing import T_State
 from nonebot.adapters import Message
 from nonebot.params import (
     Command,
-    Keyword,
-    Endswith,
-    RegexStr,
-    Fullmatch,
-    RegexDict,
     CommandArg,
-    RawCommand,
-    RegexGroup,
-    Startswith,
     CommandStart,
+    CommandWhitespace,
+    Endswith,
+    Fullmatch,
+    Keyword,
+    RawCommand,
+    RegexDict,
+    RegexGroup,
     RegexMatched,
+    RegexStr,
     ShellCommandArgs,
     ShellCommandArgv,
-    CommandWhitespace,
+    Startswith,
 )
+from nonebot.typing import T_State
 
 
 async def state(x: T_State) -> T_State:
+    return x
+
+
+async def postpone_state(x: "T_State") -> T_State:
     return x
 
 
@@ -29,11 +33,10 @@ async def legacy_state(state):
     return state
 
 
-async def not_legacy_state(state: int):
-    ...
+async def not_legacy_state(state: int): ...
 
 
-async def command(cmd: Tuple[str, ...] = Command()) -> Tuple[str, ...]:
+async def command(cmd: tuple[str, ...] = Command()) -> tuple[str, ...]:
     return cmd
 
 
@@ -60,8 +63,8 @@ async def shell_command_args(
 
 
 async def shell_command_argv(
-    shell_command_argv: List[str] = ShellCommandArgv(),
-) -> List[str]:
+    shell_command_argv: list[str] = ShellCommandArgv(),
+) -> list[str]:
     return shell_command_argv
 
 
@@ -69,16 +72,21 @@ async def regex_dict(regex_dict: dict = RegexDict()) -> dict:
     return regex_dict
 
 
-async def regex_group(regex_group: Tuple = RegexGroup()) -> Tuple:
+async def regex_group(regex_group: tuple = RegexGroup()) -> tuple:
     return regex_group
 
 
-async def regex_matched(regex_matched: str = RegexMatched()) -> str:
+async def regex_matched(regex_matched: Match[str] = RegexMatched()) -> Match[str]:
     return regex_matched
 
 
-async def regex_str(regex_matched: str = RegexStr()) -> str:
-    return regex_matched
+async def regex_str(
+    entire: str = RegexStr(),
+    type_: str = RegexStr("type"),
+    second: str = RegexStr(2),
+    groups: tuple[str, ...] = RegexStr(1, "arg"),
+) -> tuple[str, str, str, tuple[str, ...]]:
+    return entire, type_, second, groups
 
 
 async def startswith(startswith: str = Startswith()) -> str:

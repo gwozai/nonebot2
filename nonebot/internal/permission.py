@@ -1,15 +1,16 @@
-import asyncio
-from typing_extensions import Self
 from contextlib import AsyncExitStack
-from typing import Set, Tuple, Union, NoReturn, Optional
+from typing import ClassVar, NoReturn, Optional, Union
+from typing_extensions import Self
+
+import anyio
 
 from nonebot.dependencies import Dependent
-from nonebot.utils import run_coro_with_catch
 from nonebot.exception import SkippedException
 from nonebot.typing import T_DependencyCache, T_PermissionChecker
+from nonebot.utils import run_coro_with_catch
 
 from .adapter import Bot, Event
-from .params import BotParam, EventParam, DependParam, DefaultParam
+from .params import BotParam, DefaultParam, DependParam, EventParam, Param
 
 
 class Permission:
@@ -30,7 +31,7 @@ class Permission:
 
     __slots__ = ("checkers",)
 
-    HANDLER_PARAM_TYPES = [
+    HANDLER_PARAM_TYPES: ClassVar[list[type[Param]]] = [
         DependParam,
         BotParam,
         EventParam,
@@ -38,11 +39,13 @@ class Permission:
     ]
 
     def __init__(self, *checkers: Union[T_PermissionChecker, Dependent[bool]]) -> None:
-        self.checkers: Set[Dependent[bool]] = {
-            checker
-            if isinstance(checker, Dependent)
-            else Dependent[bool].parse(
-                call=checker, allow_types=self.HANDLER_PARAM_TYPES
+        self.checkers: set[Dependent[bool]] = {
+            (
+                checker
+                if isinstance(checker, Dependent)
+                else Dependent[bool].parse(
+                    call=checker, allow_types=self.HANDLER_PARAM_TYPES
+                )
             )
             for checker in checkers
         }
@@ -68,22 +71,26 @@ class Permission:
         """
         if not self.checkers:
             return True
-        results = await asyncio.gather(
-            *(
-                run_coro_with_catch(
-                    checker(
-                        bot=bot,
-                        event=event,
-                        stack=stack,
-                        dependency_cache=dependency_cache,
-                    ),
-                    (SkippedException,),
-                    False,
-                )
-                for checker in self.checkers
-            ),
-        )
-        return any(results)
+
+        result = False
+
+        async def _run_checker(checker: Dependent[bool]) -> None:
+            nonlocal result
+            # calculate the result first to avoid data racing
+            is_passed = await run_coro_with_catch(
+                checker(
+                    bot=bot, event=event, stack=stack, dependency_cache=dependency_cache
+                ),
+                (SkippedException,),
+                False,
+            )
+            result |= is_passed
+
+        async with anyio.create_task_group() as tg:
+            for checker in self.checkers:
+                tg.start_soon(_run_checker, checker)
+
+        return result
 
     def __and__(self, other: object) -> NoReturn:
         raise RuntimeError("And operation between Permissions is not allowed.")
@@ -117,10 +124,10 @@ class User:
         perm: 需同时满足的权限
     """
 
-    __slots__ = ("users", "perm")
+    __slots__ = ("perm", "users")
 
     def __init__(
-        self, users: Tuple[str, ...], perm: Optional[Permission] = None
+        self, users: tuple[str, ...], perm: Optional[Permission] = None
     ) -> None:
         self.users = users
         self.perm = perm
@@ -144,7 +151,7 @@ class User:
     @classmethod
     def _clean_permission(cls, perm: Permission) -> Optional[Permission]:
         if len(perm.checkers) == 1 and isinstance(
-            user_perm := tuple(perm.checkers)[0].call, cls
+            user_perm := next(iter(perm.checkers)).call, cls
         ):
             return user_perm.perm
         return perm

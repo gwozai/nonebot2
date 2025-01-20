@@ -1,25 +1,24 @@
-from typing import Type
 from datetime import datetime, timezone
 
-from nonebot.adapters import Event
-from nonebot.matcher import Matcher
 from nonebot import (
     CommandGroup,
     MatcherGroup,
     on,
-    on_type,
-    on_regex,
-    on_notice,
     on_command,
-    on_keyword,
-    on_message,
-    on_request,
     on_endswith,
     on_fullmatch,
+    on_keyword,
+    on_message,
     on_metaevent,
-    on_startswith,
+    on_notice,
+    on_regex,
+    on_request,
     on_shell_command,
+    on_startswith,
+    on_type,
 )
+from nonebot.adapters import Event
+from nonebot.matcher import Matcher
 
 
 async def rule() -> bool:
@@ -52,7 +51,7 @@ matcher_on = on(
 )
 
 
-def matcher_on_factory() -> Type[Matcher]:
+def matcher_on_factory() -> type[Matcher]:
     return on(
         "test",
         rule=rule,
@@ -202,8 +201,7 @@ matcher_on_regex = on_regex(
 )
 
 
-class TestEvent(Event):
-    ...
+class TestEvent(Event): ...
 
 
 matcher_on_type = on_type(
@@ -220,7 +218,7 @@ matcher_on_type = on_type(
 
 
 cmd_group = CommandGroup(
-    "test",
+    "prefix",
     rule=rule,
     permission=permission,
     handlers=[handler],
@@ -230,8 +228,30 @@ cmd_group = CommandGroup(
     block=True,
     state=state,
 )
-matcher_sub_cmd = cmd_group.command("sub")
-matcher_sub_shell_cmd = cmd_group.shell_command("sub")
+matcher_prefix_cmd = cmd_group.command("sub", aliases={"help", ("help", "foo")})
+matcher_prefix_shell_cmd = cmd_group.shell_command(
+    "sub", aliases={"help", ("help", "foo")}
+)
+
+
+cmd_group_prefix_aliases = CommandGroup(
+    "prefix",
+    prefix_aliases=True,
+    rule=rule,
+    permission=permission,
+    handlers=[handler],
+    temp=True,
+    expire_time=expire_time,
+    priority=priority,
+    block=True,
+    state=state,
+)
+matcher_prefix_aliases_cmd = cmd_group_prefix_aliases.command(
+    "sub", aliases={"help", ("help", "foo")}
+)
+matcher_prefix_aliases_shell_cmd = cmd_group_prefix_aliases.shell_command(
+    "sub", aliases={"help", ("help", "foo")}
+)
 
 
 matcher_group = MatcherGroup(

@@ -11,38 +11,42 @@ pip install nonebot2[quart]
 :::
 
 FrontMatter:
+    mdx:
+        format: md
     sidebar_position: 5
     description: nonebot.drivers.quart 模块
 """
 
 import asyncio
 from functools import wraps
-from typing import Any, Dict, List, Tuple, Union, TypeVar, Callable, Optional, Coroutine
+from typing import Any, Optional, Union, cast
+from typing_extensions import override
 
-from pydantic import BaseSettings
+from pydantic import BaseModel
 
-from nonebot.config import Env
-from nonebot.typing import overrides
-from nonebot.exception import WebSocketClosed
-from nonebot.internal.driver import FileTypes
+from nonebot.compat import model_dump, type_validate_python
 from nonebot.config import Config as NoneBotConfig
+from nonebot.config import Env
+from nonebot.drivers import ASGIMixin, HTTPServerSetup, WebSocketServerSetup
+from nonebot.drivers import Driver as BaseDriver
 from nonebot.drivers import Request as BaseRequest
 from nonebot.drivers import WebSocket as BaseWebSocket
-from nonebot.drivers import ReverseDriver, HTTPServerSetup, WebSocketServerSetup
+from nonebot.exception import WebSocketClosed
+from nonebot.internal.driver import FileTypes
 
 try:
-    import uvicorn
-    from quart import request as _request
-    from quart import websocket as _websocket
     from quart import Quart, Request, Response
-    from quart.datastructures import FileStorage
     from quart import Websocket as QuartWebSocket
+    from quart import request as _request
+    from quart.ctx import WebsocketContext
+    from quart.datastructures import FileStorage
+    from quart.globals import websocket_ctx
+    import uvicorn
 except ModuleNotFoundError as e:  # pragma: no cover
     raise ImportError(
-        "Please install Quart by using `pip install nonebot2[quart]`"
+        "Please install Quart first to use this driver. "
+        "Install with pip: `pip install nonebot2[quart]`"
     ) from e
-
-_AsyncCallable = TypeVar("_AsyncCallable", bound=Callable[..., Coroutine])
 
 
 def catch_closed(func):
@@ -56,63 +60,62 @@ def catch_closed(func):
     return decorator
 
 
-class Config(BaseSettings):
+class Config(BaseModel):
     """Quart 驱动框架设置"""
 
     quart_reload: bool = False
     """开启/关闭冷重载"""
-    quart_reload_dirs: Optional[List[str]] = None
+    quart_reload_dirs: Optional[list[str]] = None
     """重载监控文件夹列表，默认为 uvicorn 默认值"""
     quart_reload_delay: float = 0.25
     """重载延迟，默认为 uvicorn 默认值"""
-    quart_reload_includes: Optional[List[str]] = None
+    quart_reload_includes: Optional[list[str]] = None
     """要监听的文件列表，支持 glob pattern，默认为 uvicorn 默认值"""
-    quart_reload_excludes: Optional[List[str]] = None
+    quart_reload_excludes: Optional[list[str]] = None
     """不要监听的文件列表，支持 glob pattern，默认为 uvicorn 默认值"""
-    quart_extra: Dict[str, Any] = {}
+    quart_extra: dict[str, Any] = {}
     """传递给 `Quart` 的其他参数。"""
 
-    class Config:
-        extra = "ignore"
 
-
-class Driver(ReverseDriver):
+class Driver(BaseDriver, ASGIMixin):
     """Quart 驱动框架"""
 
     def __init__(self, env: Env, config: NoneBotConfig):
         super().__init__(env, config)
 
-        self.quart_config = Config(**config.dict())
+        self.quart_config = type_validate_python(Config, model_dump(config))
 
         self._server_app = Quart(
             self.__class__.__qualname__, **self.quart_config.quart_extra
         )
+        self._server_app.before_serving(self._lifespan.startup)
+        self._server_app.after_serving(self._lifespan.shutdown)
 
     @property
-    @overrides(ReverseDriver)
+    @override
     def type(self) -> str:
         """驱动名称: `quart`"""
         return "quart"
 
     @property
-    @overrides(ReverseDriver)
+    @override
     def server_app(self) -> Quart:
         """`Quart` 对象"""
         return self._server_app
 
     @property
-    @overrides(ReverseDriver)
+    @override
     def asgi(self):
         """`Quart` 对象"""
         return self._server_app
 
     @property
-    @overrides(ReverseDriver)
+    @override
     def logger(self):
         """Quart 使用的 logger"""
         return self._server_app.logger
 
-    @overrides(ReverseDriver)
+    @override
     def setup_http_server(self, setup: HTTPServerSetup):
         async def _handle() -> Response:
             return await self._handle_http(setup)
@@ -124,7 +127,7 @@ class Driver(ReverseDriver):
             view_func=_handle,
         )
 
-    @overrides(ReverseDriver)
+    @override
     def setup_websocket_server(self, setup: WebSocketServerSetup) -> None:
         async def _handle() -> None:
             return await self._handle_ws(setup)
@@ -135,22 +138,12 @@ class Driver(ReverseDriver):
             view_func=_handle,
         )
 
-    @overrides(ReverseDriver)
-    def on_startup(self, func: _AsyncCallable) -> _AsyncCallable:
-        """参考文档: [`Startup and Shutdown`](https://pgjones.gitlab.io/quart/how_to_guides/startup_shutdown.html)"""
-        return self.server_app.before_serving(func)  # type: ignore
-
-    @overrides(ReverseDriver)
-    def on_shutdown(self, func: _AsyncCallable) -> _AsyncCallable:
-        """参考文档: [`Startup and Shutdown`](https://pgjones.gitlab.io/quart/how_to_guides/startup_shutdown.html)"""
-        return self.server_app.after_serving(func)  # type: ignore
-
-    @overrides(ReverseDriver)
+    @override
     def run(
         self,
         host: Optional[str] = None,
         port: Optional[int] = None,
-        *,
+        *args,
         app: Optional[str] = None,
         **kwargs,
     ):
@@ -188,13 +181,11 @@ class Driver(ReverseDriver):
     async def _handle_http(self, setup: HTTPServerSetup) -> Response:
         request: Request = _request
 
-        json = None
-        if request.is_json:
-            json = await request.get_json()
+        json = await request.get_json() if request.is_json else None
 
         data = await request.form
         files_dict = await request.files
-        files: List[Tuple[str, FileTypes]] = []
+        files: list[tuple[str, FileTypes]] = []
         key: str
         value: FileStorage
         for key, value in files_dict.items():
@@ -223,7 +214,8 @@ class Driver(ReverseDriver):
         )
 
     async def _handle_ws(self, setup: WebSocketServerSetup) -> None:
-        websocket: QuartWebSocket = _websocket
+        ctx = cast(WebsocketContext, websocket_ctx.copy())
+        websocket = websocket_ctx.websocket
 
         http_request = BaseRequest(
             websocket.method,
@@ -233,7 +225,7 @@ class Driver(ReverseDriver):
             version=websocket.http_version,
         )
 
-        ws = WebSocket(request=http_request, websocket=websocket)
+        ws = WebSocket(request=http_request, websocket_ctx=ctx)
 
         await setup.handle_func(ws)
 
@@ -241,30 +233,34 @@ class Driver(ReverseDriver):
 class WebSocket(BaseWebSocket):
     """Quart WebSocket Wrapper"""
 
-    def __init__(self, *, request: BaseRequest, websocket: QuartWebSocket):
+    def __init__(self, *, request: BaseRequest, websocket_ctx: WebsocketContext):
         super().__init__(request=request)
-        self.websocket = websocket
+        self.websocket_ctx = websocket_ctx
 
     @property
-    @overrides(BaseWebSocket)
+    def websocket(self) -> QuartWebSocket:
+        return self.websocket_ctx.websocket
+
+    @property
+    @override
     def closed(self):
         # FIXME
         return True
 
-    @overrides(BaseWebSocket)
+    @override
     async def accept(self):
         await self.websocket.accept()
 
-    @overrides(BaseWebSocket)
+    @override
     async def close(self, code: int = 1000, reason: str = ""):
         await self.websocket.close(code, reason)
 
-    @overrides(BaseWebSocket)
+    @override
     @catch_closed
     async def receive(self) -> Union[str, bytes]:
         return await self.websocket.receive()
 
-    @overrides(BaseWebSocket)
+    @override
     @catch_closed
     async def receive_text(self) -> str:
         msg = await self.websocket.receive()
@@ -272,7 +268,7 @@ class WebSocket(BaseWebSocket):
             raise TypeError("WebSocket received unexpected frame type: bytes")
         return msg
 
-    @overrides(BaseWebSocket)
+    @override
     @catch_closed
     async def receive_bytes(self) -> bytes:
         msg = await self.websocket.receive()
@@ -280,11 +276,11 @@ class WebSocket(BaseWebSocket):
             raise TypeError("WebSocket received unexpected frame type: str")
         return msg
 
-    @overrides(BaseWebSocket)
+    @override
     async def send_text(self, data: str):
         await self.websocket.send(data)
 
-    @overrides(BaseWebSocket)
+    @override
     async def send_bytes(self, data: bytes):
         await self.websocket.send(data)
 

@@ -1,31 +1,32 @@
+from _string import formatter_field_name_split  # type: ignore
+from collections.abc import Mapping, Sequence
 import functools
 from string import Formatter
 from typing import (
     TYPE_CHECKING,
     Any,
-    Set,
-    Dict,
-    List,
-    Type,
-    Tuple,
-    Union,
-    Generic,
-    Mapping,
-    TypeVar,
     Callable,
+    Generic,
     Optional,
-    Sequence,
+    TypeVar,
+    Union,
     cast,
     overload,
 )
+from typing_extensions import TypeAlias
 
 if TYPE_CHECKING:
     from .message import Message, MessageSegment
 
+    def formatter_field_name_split(
+        field_name: str,
+    ) -> tuple[str, list[tuple[bool, str]]]: ...
+
+
 TM = TypeVar("TM", bound="Message")
 TF = TypeVar("TF", str, "Message")
 
-FormatSpecFunc = Callable[[Any], str]
+FormatSpecFunc: TypeAlias = Callable[[Any], str]
 FormatSpecFunc_T = TypeVar("FormatSpecFunc_T", bound=FormatSpecFunc)
 
 
@@ -35,26 +36,35 @@ class MessageTemplate(Formatter, Generic[TF]):
     参数:
         template: 模板
         factory: 消息类型工厂，默认为 `str`
+        private_getattr: 是否允许在模板中访问私有属性，默认为 `False`
     """
 
     @overload
     def __init__(
-        self: "MessageTemplate[str]", template: str, factory: Type[str] = str
-    ) -> None:
-        ...
+        self: "MessageTemplate[str]",
+        template: str,
+        factory: type[str] = str,
+        private_getattr: bool = False,
+    ) -> None: ...
 
     @overload
     def __init__(
-        self: "MessageTemplate[TM]", template: Union[str, TM], factory: Type[TM]
-    ) -> None:
-        ...
+        self: "MessageTemplate[TM]",
+        template: Union[str, TM],
+        factory: type[TM],
+        private_getattr: bool = False,
+    ) -> None: ...
 
     def __init__(
-        self, template: Union[str, TM], factory: Union[Type[str], Type[TM]] = str
+        self,
+        template: Union[str, TM],
+        factory: Union[type[str], type[TM]] = str,
+        private_getattr: bool = False,
     ) -> None:
         self.template: TF = template  # type: ignore
-        self.factory: Type[TF] = factory  # type: ignore
-        self.format_specs: Dict[str, FormatSpecFunc] = {}
+        self.factory: type[TF] = factory  # type: ignore
+        self.format_specs: dict[str, FormatSpecFunc] = {}
+        self.private_getattr = private_getattr
 
     def __repr__(self) -> str:
         return f"MessageTemplate({self.template!r}, factory={self.factory!r})"
@@ -68,7 +78,9 @@ class MessageTemplate(Formatter, Generic[TF]):
         self.format_specs[name] = spec
         return spec
 
-    def format(self, *args, **kwargs):
+    def format(  # pyright: ignore[reportIncompatibleMethodOverride]
+        self, *args, **kwargs
+    ) -> TF:
         """根据传入参数和模板生成消息对象"""
         return self._format(args, kwargs)
 
@@ -101,7 +113,7 @@ class MessageTemplate(Formatter, Generic[TF]):
         self.check_unused_args(used_args, args, kwargs)
         return cast(TF, full_message)
 
-    def vformat(
+    def vformat(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         format_string: str,
         args: Sequence[Any],
@@ -109,15 +121,15 @@ class MessageTemplate(Formatter, Generic[TF]):
     ) -> TF:
         raise NotImplementedError("`vformat` has merged into `_format`")
 
-    def _vformat(
+    def _vformat(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         format_string: str,
         args: Sequence[Any],
         kwargs: Mapping[str, Any],
-        used_args: Set[Union[int, str]],
+        used_args: set[Union[int, str]],
         auto_arg_index: int = 0,
-    ) -> Tuple[TF, int]:
-        results: List[Any] = [self.factory()]
+    ) -> tuple[TF, int]:
+        results: list[Any] = [self.factory()]
 
         for literal_text, field_name, format_spec, conversion in self.parse(
             format_string
@@ -166,10 +178,23 @@ class MessageTemplate(Formatter, Generic[TF]):
 
         return functools.reduce(self._add, results), auto_arg_index
 
+    def get_field(
+        self, field_name: str, args: Sequence[Any], kwargs: Mapping[str, Any]
+    ) -> tuple[Any, Union[int, str]]:
+        first, rest = formatter_field_name_split(field_name)
+        obj = self.get_value(first, args, kwargs)
+
+        for is_attr, value in rest:
+            if not self.private_getattr and value.startswith("_"):
+                raise ValueError("Cannot access private attribute")
+            obj = getattr(obj, value) if is_attr else obj[value]
+
+        return obj, first
+
     def format_field(self, value: Any, format_spec: str) -> Any:
         formatter: Optional[FormatSpecFunc] = self.format_specs.get(format_spec)
         if formatter is None and not issubclass(self.factory, str):
-            segment_class: Type["MessageSegment"] = self.factory.get_segment_class()
+            segment_class: type["MessageSegment"] = self.factory.get_segment_class()
             method = getattr(segment_class, format_spec, None)
             if callable(method) and not cast(str, method.__name__).startswith("_"):
                 formatter = getattr(segment_class, format_spec)

@@ -1,18 +1,21 @@
 import abc
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any, Dict, AsyncGenerator
+from typing import Any
 
 from nonebot.config import Config
 from nonebot.internal.driver import (
+    ASGIMixin,
     Driver,
+    HTTPClientMixin,
+    HTTPServerSetup,
     Request,
     Response,
     WebSocket,
-    ForwardDriver,
-    ReverseDriver,
-    HTTPServerSetup,
+    WebSocketClientMixin,
     WebSocketServerSetup,
 )
+from nonebot.internal.driver._lifespan import LIFESPAN_FUNC
 
 from .bot import Bot
 
@@ -30,7 +33,7 @@ class Adapter(abc.ABC):
     def __init__(self, driver: Driver, **kwargs: Any):
         self.driver: Driver = driver
         """{ref}`nonebot.drivers.Driver` 实例"""
-        self.bots: Dict[str, Bot] = {}
+        self.bots: dict[str, Bot] = {}
         """本协议适配器已建立连接的 {ref}`nonebot.adapters.Bot` 实例"""
 
     def __repr__(self) -> str:
@@ -72,29 +75,32 @@ class Adapter(abc.ABC):
 
     def setup_http_server(self, setup: HTTPServerSetup):
         """设置一个 HTTP 服务器路由配置"""
-        if not isinstance(self.driver, ReverseDriver):
+        if not isinstance(self.driver, ASGIMixin):
             raise TypeError("Current driver does not support http server")
         self.driver.setup_http_server(setup)
 
     def setup_websocket_server(self, setup: WebSocketServerSetup):
         """设置一个 WebSocket 服务器路由配置"""
-        if not isinstance(self.driver, ReverseDriver):
+        if not isinstance(self.driver, ASGIMixin):
             raise TypeError("Current driver does not support websocket server")
         self.driver.setup_websocket_server(setup)
 
     async def request(self, setup: Request) -> Response:
         """进行一个 HTTP 客户端请求"""
-        if not isinstance(self.driver, ForwardDriver):
+        if not isinstance(self.driver, HTTPClientMixin):
             raise TypeError("Current driver does not support http client")
         return await self.driver.request(setup)
 
     @asynccontextmanager
     async def websocket(self, setup: Request) -> AsyncGenerator[WebSocket, None]:
         """建立一个 WebSocket 客户端连接请求"""
-        if not isinstance(self.driver, ForwardDriver):
+        if not isinstance(self.driver, WebSocketClientMixin):
             raise TypeError("Current driver does not support websocket client")
         async with self.driver.websocket(setup) as ws:
             yield ws
+
+    def on_ready(self, func: LIFESPAN_FUNC) -> LIFESPAN_FUNC:
+        return self.driver._lifespan.on_ready(func)
 
     @abc.abstractmethod
     async def _call_api(self, bot: Bot, api: str, **data: Any) -> Any:

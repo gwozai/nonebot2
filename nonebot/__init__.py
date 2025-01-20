@@ -24,31 +24,39 @@
 - `load_all_plugins` => {ref}``load_all_plugins` <nonebot.plugin.load.load_all_plugins>`
 - `load_from_json` => {ref}``load_from_json` <nonebot.plugin.load.load_from_json>`
 - `load_from_toml` => {ref}``load_from_toml` <nonebot.plugin.load.load_from_toml>`
-- `load_builtin_plugin` => {ref}``load_builtin_plugin` <nonebot.plugin.load.load_builtin_plugin>`
-- `load_builtin_plugins` => {ref}``load_builtin_plugins` <nonebot.plugin.load.load_builtin_plugins>`
+- `load_builtin_plugin` =>
+  {ref}``load_builtin_plugin` <nonebot.plugin.load.load_builtin_plugin>`
+- `load_builtin_plugins` =>
+  {ref}``load_builtin_plugins` <nonebot.plugin.load.load_builtin_plugins>`
 - `get_plugin` => {ref}``get_plugin` <nonebot.plugin.get_plugin>`
-- `get_plugin_by_module_name` => {ref}``get_plugin_by_module_name` <nonebot.plugin.get_plugin_by_module_name>`
-- `get_loaded_plugins` => {ref}``get_loaded_plugins` <nonebot.plugin.get_loaded_plugins>`
-- `get_available_plugin_names` => {ref}``get_available_plugin_names` <nonebot.plugin.get_available_plugin_names>`
+- `get_plugin_by_module_name` =>
+  {ref}``get_plugin_by_module_name` <nonebot.plugin.get_plugin_by_module_name>`
+- `get_loaded_plugins` =>
+  {ref}``get_loaded_plugins` <nonebot.plugin.get_loaded_plugins>`
+- `get_available_plugin_names` =>
+  {ref}``get_available_plugin_names` <nonebot.plugin.get_available_plugin_names>`
+- `get_plugin_config` => {ref}``get_plugin_config` <nonebot.plugin.get_plugin_config>`
 - `require` => {ref}``require` <nonebot.plugin.load.require>`
 
 FrontMatter:
+    mdx:
+        format: md
     sidebar_position: 0
     description: nonebot 模块
 """
 
-import os
 from importlib.metadata import version
-from typing import Any, Dict, Type, Union, TypeVar, Optional, overload
+import os
+from typing import Any, Optional, TypeVar, Union, overload
 
 import loguru
-from pydantic.env_settings import DotenvType
 
-from nonebot.config import Env, Config
+from nonebot.adapters import Adapter, Bot
+from nonebot.compat import model_dump
+from nonebot.config import DOTENV_TYPE, Config, Env
+from nonebot.drivers import ASGIMixin, Driver, combine_driver
 from nonebot.log import logger as logger
-from nonebot.adapters import Bot, Adapter
 from nonebot.utils import escape_tag, resolve_dot_notation
-from nonebot.drivers import Driver, ReverseDriver, combine_driver
 
 try:
     __version__ = version("nonebot2")
@@ -69,7 +77,8 @@ def get_driver() -> Driver:
         全局 {ref}`nonebot.drivers.Driver` 对象
 
     异常:
-        ValueError: 全局 {ref}`nonebot.drivers.Driver` 对象尚未初始化 ({ref}`nonebot.init <nonebot.init>` 尚未调用)
+        ValueError: 全局 {ref}`nonebot.drivers.Driver` 对象尚未初始化
+            ({ref}`nonebot.init <nonebot.init>` 尚未调用)
 
     用法:
         ```python
@@ -83,23 +92,33 @@ def get_driver() -> Driver:
 
 @overload
 def get_adapter(name: str) -> Adapter:
-    ...
+    """
+    参数:
+        name: 适配器名称
+
+    返回:
+        指定名称的 {ref}`nonebot.adapters.Adapter` 对象
+    """
 
 
 @overload
-def get_adapter(name: Type[A]) -> A:
-    ...
-
-
-def get_adapter(name: Union[str, Type[Adapter]]) -> Adapter:
-    """获取已注册的 {ref}`nonebot.adapters.Adapter` 实例。
+def get_adapter(name: type[A]) -> A:
+    """
+    参数:
+        name: 适配器类型
 
     返回:
-        指定名称或类型的 {ref}`nonebot.adapters.Adapter` 对象
+        指定类型的 {ref}`nonebot.adapters.Adapter` 对象
+    """
+
+
+def get_adapter(name: Union[str, type[Adapter]]) -> Adapter:
+    """获取已注册的 {ref}`nonebot.adapters.Adapter` 实例。
 
     异常:
         ValueError: 指定的 {ref}`nonebot.adapters.Adapter` 未注册
-        ValueError: 全局 {ref}`nonebot.drivers.Driver` 对象尚未初始化 ({ref}`nonebot.init <nonebot.init>` 尚未调用)
+        ValueError: 全局 {ref}`nonebot.drivers.Driver` 对象尚未初始化
+            ({ref}`nonebot.init <nonebot.init>` 尚未调用)
 
     用法:
         ```python
@@ -114,14 +133,15 @@ def get_adapter(name: Union[str, Type[Adapter]]) -> Adapter:
     return adapters[target]
 
 
-def get_adapters() -> Dict[str, Adapter]:
+def get_adapters() -> dict[str, Adapter]:
     """获取所有已注册的 {ref}`nonebot.adapters.Adapter` 实例。
 
     返回:
         所有 {ref}`nonebot.adapters.Adapter` 实例字典
 
     异常:
-        ValueError: 全局 {ref}`nonebot.drivers.Driver` 对象尚未初始化 ({ref}`nonebot.init <nonebot.init>` 尚未调用)
+        ValueError: 全局 {ref}`nonebot.drivers.Driver` 对象尚未初始化
+            ({ref}`nonebot.init <nonebot.init>` 尚未调用)
 
     用法:
         ```python
@@ -132,14 +152,15 @@ def get_adapters() -> Dict[str, Adapter]:
 
 
 def get_app() -> Any:
-    """获取全局 {ref}`nonebot.drivers.ReverseDriver` 对应的 Server App 对象。
+    """获取全局 {ref}`nonebot.drivers.ASGIMixin` 对应的 Server App 对象。
 
     返回:
         Server App 对象
 
     异常:
-        AssertionError: 全局 Driver 对象不是 {ref}`nonebot.drivers.ReverseDriver` 类型
-        ValueError: 全局 {ref}`nonebot.drivers.Driver` 对象尚未初始化 ({ref}`nonebot.init <nonebot.init>` 尚未调用)
+        AssertionError: 全局 Driver 对象不是 {ref}`nonebot.drivers.ASGIMixin` 类型
+        ValueError: 全局 {ref}`nonebot.drivers.Driver` 对象尚未初始化
+            ({ref}`nonebot.init <nonebot.init>` 尚未调用)
 
     用法:
         ```python
@@ -147,21 +168,21 @@ def get_app() -> Any:
         ```
     """
     driver = get_driver()
-    assert isinstance(
-        driver, ReverseDriver
-    ), "app object is only available for reverse driver"
+    assert isinstance(driver, ASGIMixin), "app object is only available for asgi driver"
     return driver.server_app
 
 
 def get_asgi() -> Any:
-    """获取全局 {ref}`nonebot.drivers.ReverseDriver` 对应 [ASGI](https://asgi.readthedocs.io/) 对象。
+    """获取全局 {ref}`nonebot.drivers.ASGIMixin` 对应的
+    [ASGI](https://asgi.readthedocs.io/) 对象。
 
     返回:
         ASGI 对象
 
     异常:
-        AssertionError: 全局 Driver 对象不是 {ref}`nonebot.drivers.ReverseDriver` 类型
-        ValueError: 全局 {ref}`nonebot.drivers.Driver` 对象尚未初始化 ({ref}`nonebot.init <nonebot.init>` 尚未调用)
+        AssertionError: 全局 Driver 对象不是 {ref}`nonebot.drivers.ASGIMixin` 类型
+        ValueError: 全局 {ref}`nonebot.drivers.Driver` 对象尚未初始化
+            ({ref}`nonebot.init <nonebot.init>` 尚未调用)
 
     用法:
         ```python
@@ -170,8 +191,8 @@ def get_asgi() -> Any:
     """
     driver = get_driver()
     assert isinstance(
-        driver, ReverseDriver
-    ), "asgi object is only available for reverse driver"
+        driver, ASGIMixin
+    ), "asgi object is only available for asgi driver"
     return driver.asgi
 
 
@@ -182,7 +203,8 @@ def get_bot(self_id: Optional[str] = None) -> Bot:
     当不提供时，返回一个 {ref}`nonebot.adapters.Bot`。
 
     参数:
-        self_id: 用来识别 {ref}`nonebot.adapters.Bot` 的 {ref}`nonebot.adapters.Bot.self_id` 属性
+        self_id: 用来识别 {ref}`nonebot.adapters.Bot` 的
+            {ref}`nonebot.adapters.Bot.self_id` 属性
 
     返回:
         {ref}`nonebot.adapters.Bot` 对象
@@ -190,7 +212,8 @@ def get_bot(self_id: Optional[str] = None) -> Bot:
     异常:
         KeyError: 对应 self_id 的 Bot 不存在
         ValueError: 没有传入 self_id 且没有 Bot 可用
-        ValueError: 全局 {ref}`nonebot.drivers.Driver` 对象尚未初始化 ({ref}`nonebot.init <nonebot.init>` 尚未调用)
+        ValueError: 全局 {ref}`nonebot.drivers.Driver` 对象尚未初始化
+            ({ref}`nonebot.init <nonebot.init>` 尚未调用)
 
     用法:
         ```python
@@ -209,14 +232,16 @@ def get_bot(self_id: Optional[str] = None) -> Bot:
     raise ValueError("There are no bots to get.")
 
 
-def get_bots() -> Dict[str, Bot]:
+def get_bots() -> dict[str, Bot]:
     """获取所有连接到 NoneBot 的 {ref}`nonebot.adapters.Bot` 对象。
 
     返回:
-        一个以 {ref}`nonebot.adapters.Bot.self_id` 为键，{ref}`nonebot.adapters.Bot` 对象为值的字典
+        一个以 {ref}`nonebot.adapters.Bot.self_id` 为键
+        {ref}`nonebot.adapters.Bot` 对象为值的字典
 
     异常:
-        ValueError: 全局 {ref}`nonebot.drivers.Driver` 对象尚未初始化 ({ref}`nonebot.init <nonebot.init>` 尚未调用)
+        ValueError: 全局 {ref}`nonebot.drivers.Driver` 对象尚未初始化
+            ({ref}`nonebot.init <nonebot.init>` 尚未调用)
 
     用法:
         ```python
@@ -226,7 +251,7 @@ def get_bots() -> Dict[str, Bot]:
     return get_driver().bots
 
 
-def _resolve_combine_expr(obj_str: str) -> Type[Driver]:
+def _resolve_combine_expr(obj_str: str) -> type[Driver]:
     drivers = obj_str.split("+")
     DriverClass = resolve_dot_notation(
         drivers[0], "Driver", default_prefix="nonebot.drivers."
@@ -243,15 +268,16 @@ def _resolve_combine_expr(obj_str: str) -> Type[Driver]:
 
 
 def _log_patcher(record: "loguru.Record"):
+    """使用插件标识优化日志展示"""
     record["name"] = (
-        plugin.name
+        plugin.id_
         if (module_name := record["name"])
         and (plugin := get_plugin_by_module_name(module_name))
-        else (module_name and module_name.split(".")[0])
+        else (module_name and module_name.split(".", maxsplit=1)[0])
     )
 
 
-def init(*, _env_file: Optional[DotenvType] = None, **kwargs: Any) -> None:
+def init(*, _env_file: Optional[DOTENV_TYPE] = None, **kwargs: Any) -> None:
     """初始化 NoneBot 以及 全局 {ref}`nonebot.drivers.Driver` 对象。
 
     NoneBot 将会从 .env 文件中读取环境信息，并使用相应的 env 文件配置。
@@ -274,9 +300,11 @@ def init(*, _env_file: Optional[DotenvType] = None, **kwargs: Any) -> None:
         _env_file = _env_file or f".env.{env.environment}"
         config = Config(
             **kwargs,
-            _env_file=(".env", _env_file)
-            if isinstance(_env_file, (str, os.PathLike))
-            else _env_file,
+            _env_file=(
+                (".env", _env_file)
+                if isinstance(_env_file, (str, os.PathLike))
+                else _env_file
+            ),
         )
 
         logger.configure(
@@ -286,7 +314,7 @@ def init(*, _env_file: Optional[DotenvType] = None, **kwargs: Any) -> None:
             f"Current <y><b>Env: {escape_tag(env.environment)}</b></y>"
         )
         logger.opt(colors=True).debug(
-            f"Loaded <y><b>Config</b></y>: {escape_tag(str(config.dict()))}"
+            f"Loaded <y><b>Config</b></y>: {escape_tag(str(model_dump(config)))}"
         )
 
         DriverClass = _resolve_combine_expr(config.driver)
@@ -309,32 +337,31 @@ def run(*args: Any, **kwargs: Any) -> None:
     get_driver().run(*args, **kwargs)
 
 
-from nonebot.plugin import on as on
-from nonebot.plugin import on_type as on_type
-from nonebot.plugin import require as require
-from nonebot.plugin import on_regex as on_regex
-from nonebot.plugin import on_notice as on_notice
-from nonebot.plugin import get_plugin as get_plugin
-from nonebot.plugin import on_command as on_command
-from nonebot.plugin import on_keyword as on_keyword
-from nonebot.plugin import on_message as on_message
-from nonebot.plugin import on_request as on_request
-from nonebot.plugin import load_plugin as load_plugin
-from nonebot.plugin import on_endswith as on_endswith
 from nonebot.plugin import CommandGroup as CommandGroup
 from nonebot.plugin import MatcherGroup as MatcherGroup
-from nonebot.plugin import load_plugins as load_plugins
-from nonebot.plugin import on_fullmatch as on_fullmatch
-from nonebot.plugin import on_metaevent as on_metaevent
-from nonebot.plugin import on_startswith as on_startswith
-from nonebot.plugin import load_from_json as load_from_json
-from nonebot.plugin import load_from_toml as load_from_toml
-from nonebot.plugin import load_all_plugins as load_all_plugins
-from nonebot.plugin import on_shell_command as on_shell_command
+from nonebot.plugin import get_available_plugin_names as get_available_plugin_names
 from nonebot.plugin import get_loaded_plugins as get_loaded_plugins
+from nonebot.plugin import get_plugin as get_plugin
+from nonebot.plugin import get_plugin_by_module_name as get_plugin_by_module_name
+from nonebot.plugin import get_plugin_config as get_plugin_config
+from nonebot.plugin import load_all_plugins as load_all_plugins
 from nonebot.plugin import load_builtin_plugin as load_builtin_plugin
 from nonebot.plugin import load_builtin_plugins as load_builtin_plugins
-from nonebot.plugin import get_plugin_by_module_name as get_plugin_by_module_name
-from nonebot.plugin import get_available_plugin_names as get_available_plugin_names
-
-__autodoc__ = {"internal": False}
+from nonebot.plugin import load_from_json as load_from_json
+from nonebot.plugin import load_from_toml as load_from_toml
+from nonebot.plugin import load_plugin as load_plugin
+from nonebot.plugin import load_plugins as load_plugins
+from nonebot.plugin import on as on
+from nonebot.plugin import on_command as on_command
+from nonebot.plugin import on_endswith as on_endswith
+from nonebot.plugin import on_fullmatch as on_fullmatch
+from nonebot.plugin import on_keyword as on_keyword
+from nonebot.plugin import on_message as on_message
+from nonebot.plugin import on_metaevent as on_metaevent
+from nonebot.plugin import on_notice as on_notice
+from nonebot.plugin import on_regex as on_regex
+from nonebot.plugin import on_request as on_request
+from nonebot.plugin import on_shell_command as on_shell_command
+from nonebot.plugin import on_startswith as on_startswith
+from nonebot.plugin import on_type as on_type
+from nonebot.plugin import require as require

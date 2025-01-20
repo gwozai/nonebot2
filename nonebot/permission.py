@@ -1,18 +1,21 @@
 """本模块是 {ref}`nonebot.matcher.Matcher.permission` 的类型定义。
 
-每个 {ref}`nonebot.matcher.Matcher` 拥有一个 {ref}`nonebot.permission.Permission` ，
-其中是 `PermissionChecker` 的集合，只要有一个 `PermissionChecker` 检查结果为 `True` 时就会继续运行。
+每个{ref}`事件响应器 <nonebot.matcher.Matcher>`
+拥有一个 {ref}`nonebot.permission.Permission`，其中是 `PermissionChecker` 的集合。
+只要有一个 `PermissionChecker` 检查结果为 `True` 时就会继续运行。
 
 FrontMatter:
+    mdx:
+        format: md
     sidebar_position: 6
     description: nonebot.permission 模块
 """
 
-from nonebot.params import EventType
 from nonebot.adapters import Bot, Event
 from nonebot.internal.permission import USER as USER
-from nonebot.internal.permission import User as User
 from nonebot.internal.permission import Permission as Permission
+from nonebot.internal.permission import User as User
+from nonebot.params import EventType
 
 
 class Message:

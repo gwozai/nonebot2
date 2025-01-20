@@ -1,13 +1,15 @@
-import asyncio
 from contextlib import AsyncExitStack
-from typing import Set, Union, NoReturn, Optional
+from typing import ClassVar, NoReturn, Optional, Union
+
+import anyio
+from exceptiongroup import BaseExceptionGroup, catch
 
 from nonebot.dependencies import Dependent
 from nonebot.exception import SkippedException
-from nonebot.typing import T_State, T_RuleChecker, T_DependencyCache
+from nonebot.typing import T_DependencyCache, T_RuleChecker, T_State
 
 from .adapter import Bot, Event
-from .params import BotParam, EventParam, StateParam, DependParam, DefaultParam
+from .params import BotParam, DefaultParam, DependParam, EventParam, Param, StateParam
 
 
 class Rule:
@@ -28,7 +30,7 @@ class Rule:
 
     __slots__ = ("checkers",)
 
-    HANDLER_PARAM_TYPES = [
+    HANDLER_PARAM_TYPES: ClassVar[list[type[Param]]] = [
         DependParam,
         BotParam,
         EventParam,
@@ -37,11 +39,13 @@ class Rule:
     ]
 
     def __init__(self, *checkers: Union[T_RuleChecker, Dependent[bool]]) -> None:
-        self.checkers: Set[Dependent[bool]] = {
-            checker
-            if isinstance(checker, Dependent)
-            else Dependent[bool].parse(
-                call=checker, allow_types=self.HANDLER_PARAM_TYPES
+        self.checkers: set[Dependent[bool]] = {
+            (
+                checker
+                if isinstance(checker, Dependent)
+                else Dependent[bool].parse(
+                    call=checker, allow_types=self.HANDLER_PARAM_TYPES
+                )
             )
             for checker in checkers
         }
@@ -69,22 +73,33 @@ class Rule:
         """
         if not self.checkers:
             return True
-        try:
-            results = await asyncio.gather(
-                *(
-                    checker(
-                        bot=bot,
-                        event=event,
-                        state=state,
-                        stack=stack,
-                        dependency_cache=dependency_cache,
-                    )
-                    for checker in self.checkers
-                )
+
+        result = True
+
+        def _handle_skipped_exception(
+            exc_group: BaseExceptionGroup[SkippedException],
+        ) -> None:
+            nonlocal result
+            result = False
+
+        async def _run_checker(checker: Dependent[bool]) -> None:
+            nonlocal result
+            # calculate the result first to avoid data racing
+            is_passed = await checker(
+                bot=bot,
+                event=event,
+                state=state,
+                stack=stack,
+                dependency_cache=dependency_cache,
             )
-        except SkippedException:
-            return False
-        return all(results)
+            result &= is_passed
+
+        with catch({SkippedException: _handle_skipped_exception}):
+            async with anyio.create_task_group() as tg:
+                for checker in self.checkers:
+                    tg.start_soon(_run_checker, checker)
+
+        return result
 
     def __and__(self, other: Optional[Union["Rule", T_RuleChecker]]) -> "Rule":
         if other is None:

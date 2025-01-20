@@ -1,8 +1,9 @@
 import abc
-from typing import Any, Type, TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
+from nonebot.compat import PYDANTIC_V2, ConfigDict
 from nonebot.utils import DataclassEncoder
 
 from .message import Message
@@ -13,15 +14,21 @@ E = TypeVar("E", bound="Event")
 class Event(abc.ABC, BaseModel):
     """Event 基类。提供获取关键信息的方法，其余信息可直接获取。"""
 
-    class Config:
-        extra = "allow"
-        json_encoders = {Message: DataclassEncoder}
+    if PYDANTIC_V2:  # pragma: pydantic-v2
+        model_config = ConfigDict(extra="allow")
+    else:  # pragma: pydantic-v1
 
-    @classmethod
-    def validate(cls: Type["E"], value: Any) -> "E":
-        if isinstance(value, Event) and not isinstance(value, cls):
-            raise TypeError(f"{value} is incompatible with Event type {cls}")
-        return super().validate(value)
+        class Config(ConfigDict):
+            extra = "allow"  # type: ignore
+            json_encoders = {Message: DataclassEncoder}  # noqa: RUF012
+
+    if not PYDANTIC_V2:  # pragma: pydantic-v1
+
+        @classmethod
+        def validate(cls: type["E"], value: Any) -> "E":
+            if isinstance(value, Event) and not isinstance(value, cls):
+                raise TypeError(f"{value} is incompatible with Event type {cls}")
+            return super().validate(value)
 
     @abc.abstractmethod
     def get_type(self) -> str:
@@ -44,10 +51,11 @@ class Event(abc.ABC, BaseModel):
     def get_log_string(self) -> str:
         """获取事件日志信息的方法。
 
-        通常你不需要修改这个方法，只有当希望 NoneBot 隐藏该事件日志时，可以抛出 `NoLogException` 异常。
+        通常你不需要修改这个方法，只有当希望 NoneBot 隐藏该事件日志时，
+        可以抛出 `NoLogException` 异常。
 
         异常:
-            NoLogException:
+            NoLogException: 希望 NoneBot 隐藏该事件日志
         """
         return f"[{self.get_event_name()}]: {self.get_event_description()}"
 
@@ -58,7 +66,9 @@ class Event(abc.ABC, BaseModel):
 
     @abc.abstractmethod
     def get_session_id(self) -> str:
-        """获取会话 id 的方法，用于判断当前事件属于哪一个会话，通常是用户 id、群组 id 组合。"""
+        """获取会话 id 的方法，用于判断当前事件属于哪一个会话，
+        通常是用户 id、群组 id 组合。
+        """
         raise NotImplementedError
 
     @abc.abstractmethod
