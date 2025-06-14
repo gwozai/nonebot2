@@ -17,10 +17,14 @@ toc_max_heading_level: 2
 
 ### 💫 杂项
 
+- Develop: 修复 devcontainer feature 配置 [@yanyongyu](https://github.com/yanyongyu) ([#3515](https://github.com/nonebot/nonebot2/pull/3515))
 - CI: 修复 Ruff 并发组名称 [@KomoriDev](https://github.com/KomoriDev) ([#3434](https://github.com/nonebot/nonebot2/pull/3434))
 
 ### 🍻 插件发布
 
+- Plugin: 绝区零角色数据获取 [@noneflow](https://github.com/noneflow) ([#3512](https://github.com/nonebot/nonebot2/pull/3512))
+- Plugin: 命令冷却 [@noneflow](https://github.com/noneflow) ([#3499](https://github.com/nonebot/nonebot2/pull/3499))
+- Plugin: Hacker News [@noneflow](https://github.com/noneflow) ([#3502](https://github.com/nonebot/nonebot2/pull/3502))
 - Plugin: nonebot_plugin_df_armor_repair_simulator [@noneflow](https://github.com/noneflow) ([#3506](https://github.com/nonebot/nonebot2/pull/3506))
 - Plugin: nonebot-plugin-emojilike-automonkey [@noneflow](https://github.com/noneflow) ([#3386](https://github.com/nonebot/nonebot2/pull/3386))
 - Plugin: bfvplayerlist [@noneflow](https://github.com/noneflow) ([#3450](https://github.com/nonebot/nonebot2/pull/3450))
@@ -75,8 +79,14 @@ toc_max_heading_level: 2
 - Plugin: nonebot-plugin-aiochatllm [@noneflow](https://github.com/noneflow) ([#3358](https://github.com/nonebot/nonebot2/pull/3358))
 - Plugin: 拟人回复bot [@noneflow](https://github.com/noneflow) ([#3353](https://github.com/nonebot/nonebot2/pull/3353))
 
+### 🍻 机器人发布
+
+- Bot: Muicebot [@noneflow](https://github.com/noneflow) ([#3523](https://github.com/nonebot/nonebot2/pull/3523))
+- Bot: LiteBot [@noneflow](https://github.com/noneflow) ([#3514](https://github.com/nonebot/nonebot2/pull/3514))
+
 ### 🍻 适配器发布
 
+- Adapter: 删除 Gewechat 适配器 [@Shine-Light](https://github.com/Shine-Light) ([#3516](https://github.com/nonebot/nonebot2/pull/3516))
 - Adapter: nonebot-adapter-milky [@noneflow](https://github.com/noneflow) ([#3491](https://github.com/nonebot/nonebot2/pull/3491))
 - Adapter: Gewechat [@noneflow](https://github.com/noneflow) ([#3306](https://github.com/nonebot/nonebot2/pull/3306))
 
