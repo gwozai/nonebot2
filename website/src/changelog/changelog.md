@@ -7,8 +7,15 @@ toc_max_heading_level: 2
 
 ## 最近更新
 
+### 🚀 新功能
+
+- Feature: 为 `HTTPClient` 等内置驱动器添加流式请求方法 [@Ailitonia](https://github.com/Ailitonia) ([#3560](https://github.com/nonebot/nonebot2/pull/3560))
+
 ### 📝 文档
 
+- Docs: 修复组织成员提交 issue 时不遵守表单 [@ProgramRipper](https://github.com/ProgramRipper) ([#3558](https://github.com/nonebot/nonebot2/pull/3558))
+- Docs: 增加 `EFChat` 适配器说明 [@molanp](https://github.com/molanp) ([#3544](https://github.com/nonebot/nonebot2/pull/3544))
+- Docs: 插件发布表单描述优化 [@StarHeartHunt](https://github.com/StarHeartHunt) ([#3520](https://github.com/nonebot/nonebot2/pull/3520))
 - Docs: 增加 `Milky` 适配器说明 [@RF-Tar-Railt](https://github.com/RF-Tar-Railt) ([#3492](https://github.com/nonebot/nonebot2/pull/3492))
 - Docs: 添加 OSPP 2025 项目 [@yanyongyu](https://github.com/yanyongyu) ([#3466](https://github.com/nonebot/nonebot2/pull/3466))
 - Docs: 更新最佳实践 `Alconna` 章节 [@RF-Tar-Railt](https://github.com/RF-Tar-Railt) ([#3447](https://github.com/nonebot/nonebot2/pull/3447))
@@ -17,10 +24,24 @@ toc_max_heading_level: 2
 
 ### 💫 杂项
 
+- Plugin: 更新插件维护情况 [@Agnes4m](https://github.com/Agnes4m) ([#3555](https://github.com/nonebot/nonebot2/pull/3555))
+- Plugin: 修改 nailong 插件作者 [@superbot-ai445](https://github.com/superbot-ai445) ([#3554](https://github.com/nonebot/nonebot2/pull/3554))
+- CI: 适配 NoneFlow 4.4.0 [@he0119](https://github.com/he0119) ([#3539](https://github.com/nonebot/nonebot2/pull/3539))
+- Develop: 修复 devcontainer feature 配置 [@yanyongyu](https://github.com/yanyongyu) ([#3515](https://github.com/nonebot/nonebot2/pull/3515))
 - CI: 修复 Ruff 并发组名称 [@KomoriDev](https://github.com/KomoriDev) ([#3434](https://github.com/nonebot/nonebot2/pull/3434))
 
 ### 🍻 插件发布
 
+- Plugin: 维维表情包搜索器 [@noneflow](https://github.com/noneflow) ([#3546](https://github.com/nonebot/nonebot2/pull/3546))
+- Plugin: 喜（悲）报生成器 [@noneflow](https://github.com/noneflow) ([#3527](https://github.com/nonebot/nonebot2/pull/3527))
+- Plugin: 依赖注入扩展 [@noneflow](https://github.com/noneflow) ([#3552](https://github.com/nonebot/nonebot2/pull/3552))
+- Plugin: nonebot-plugin-orm [@noneflow](https://github.com/noneflow) ([#3557](https://github.com/nonebot/nonebot2/pull/3557))
+- Plugin: 币安小助手 [@noneflow](https://github.com/noneflow) ([#3525](https://github.com/nonebot/nonebot2/pull/3525))
+- Plugin: nonebot_plugin_sunset_reminder [@noneflow](https://github.com/noneflow) ([#3538](https://github.com/nonebot/nonebot2/pull/3538))
+- Plugin: nonebot-plugin-NobleDuel [@noneflow](https://github.com/noneflow) ([#3521](https://github.com/nonebot/nonebot2/pull/3521))
+- Plugin: 绝区零角色数据获取 [@noneflow](https://github.com/noneflow) ([#3512](https://github.com/nonebot/nonebot2/pull/3512))
+- Plugin: 命令冷却 [@noneflow](https://github.com/noneflow) ([#3499](https://github.com/nonebot/nonebot2/pull/3499))
+- Plugin: Hacker News [@noneflow](https://github.com/noneflow) ([#3502](https://github.com/nonebot/nonebot2/pull/3502))
 - Plugin: nonebot_plugin_df_armor_repair_simulator [@noneflow](https://github.com/noneflow) ([#3506](https://github.com/nonebot/nonebot2/pull/3506))
 - Plugin: nonebot-plugin-emojilike-automonkey [@noneflow](https://github.com/noneflow) ([#3386](https://github.com/nonebot/nonebot2/pull/3386))
 - Plugin: bfvplayerlist [@noneflow](https://github.com/noneflow) ([#3450](https://github.com/nonebot/nonebot2/pull/3450))
@@ -75,8 +96,15 @@ toc_max_heading_level: 2
 - Plugin: nonebot-plugin-aiochatllm [@noneflow](https://github.com/noneflow) ([#3358](https://github.com/nonebot/nonebot2/pull/3358))
 - Plugin: 拟人回复bot [@noneflow](https://github.com/noneflow) ([#3353](https://github.com/nonebot/nonebot2/pull/3353))
 
+### 🍻 机器人发布
+
+- Bot: Muicebot [@noneflow](https://github.com/noneflow) ([#3523](https://github.com/nonebot/nonebot2/pull/3523))
+- Bot: LiteBot [@noneflow](https://github.com/noneflow) ([#3514](https://github.com/nonebot/nonebot2/pull/3514))
+
 ### 🍻 适配器发布
 
+- Adapter: nonebot-adapter-efchat [@noneflow](https://github.com/noneflow) ([#3496](https://github.com/nonebot/nonebot2/pull/3496))
+- Adapter: 删除 Gewechat 适配器 [@Shine-Light](https://github.com/Shine-Light) ([#3516](https://github.com/nonebot/nonebot2/pull/3516))
 - Adapter: nonebot-adapter-milky [@noneflow](https://github.com/noneflow) ([#3491](https://github.com/nonebot/nonebot2/pull/3491))
 - Adapter: Gewechat [@noneflow](https://github.com/noneflow) ([#3306](https://github.com/nonebot/nonebot2/pull/3306))
 
