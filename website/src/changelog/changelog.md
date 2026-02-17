@@ -7,6 +7,10 @@ toc_max_heading_level: 2
 
 ## 最近更新
 
+### 💥 破坏性变更
+
+- Remove: 移除 Python 3.9 支持 [@shoucandanghehe](https://github.com/shoucandanghehe) ([#3860](https://github.com/nonebot/nonebot2/pull/3860))
+
 ### 🐛 Bug 修复
 
 - Fix: aiohttp 驱动未处理 WSMsgType.CLOSED 类型 [@shoucandanghehe](https://github.com/shoucandanghehe) ([#3862](https://github.com/nonebot/nonebot2/pull/3862))
