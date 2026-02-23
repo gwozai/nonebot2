@@ -30,6 +30,7 @@ toc_max_heading_level: 2
 
 ### 🍻 插件发布
 
+- Plugin: 自动合成emoji [@noneflow](https://github.com/noneflow) ([#3867](https://github.com/nonebot/nonebot2/pull/3867))
 - Plugin: 今日doro结局 [@noneflow](https://github.com/noneflow) ([#3852](https://github.com/nonebot/nonebot2/pull/3852))
 - Plugin: Phira Server Manager [@noneflow](https://github.com/noneflow) ([#3855](https://github.com/nonebot/nonebot2/pull/3855))
 - Plugin: Shiro Web Console [@noneflow](https://github.com/noneflow) ([#3832](https://github.com/nonebot/nonebot2/pull/3832))
