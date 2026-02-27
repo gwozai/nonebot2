@@ -17,6 +17,7 @@ toc_max_heading_level: 2
 
 ### 📝 文档
 
+- Docs: 完善对「发布插件」章节的文档描述 [@NCBM](https://github.com/NCBM) ([#3865](https://github.com/nonebot/nonebot2/pull/3865))
 - Docs: Docker 部署镜像添加 latest tag [@AhsokaTano26](https://github.com/AhsokaTano26) ([#3787](https://github.com/nonebot/nonebot2/pull/3787))
 - Docs: 调整文档 `on_command` import 路径 [@Xfjie314](https://github.com/Xfjie314) ([#3747](https://github.com/nonebot/nonebot2/pull/3747))
 - Docs: 修复插件编写准备文档中的文本错误 [@Xfjie314](https://github.com/Xfjie314) ([#3746](https://github.com/nonebot/nonebot2/pull/3746))

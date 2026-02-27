@@ -487,6 +487,7 @@ __plugin_meta__ = PluginMetadata(
 ### 避免误用同步操作
 
 NoneBot 是一个异步框架，插件中**禁止**使用任何可能阻塞事件循环的同步操作，例如：
+
 - 同步 HTTP 请求（如 `requests` 库）；
 
   **推荐**操作（以 `httpx` 为例）：
